@@ -1,0 +1,60 @@
+== summary ==
+
+Several modeling communities (notably [http://www.cmaq-model.org/ CMAQ] and [http://www.wrf-model.org/ WRF] read, write, and share data using [http://www.unidata.ucar.edu/software/netcdf/ netCDF] files augmented by [http://www.baronams.com/products/ioapi/ IOAPI] metadata. Reading and writing netCDF with [http://www.r-project.org/ R] packages has been trivial for some time, thanks to [http://meteora.ucsd.edu/~pierce/ Dave Pierce] and his [http://cran.r-project.org/web/packages/ncdf4/ ncdf4 package] (and the no-longer-supported ncdf package before that). Reading and writing IOAPI-formatted netCDF is somewhat trickier: the aim of this project is to create and maintain an R package to make that task as reliable and usable as reading and writing "plain vanilla" netCDF.
+
+== manually writing IOAPI ==
+
+Here is one method for writing out IOAPI-formatted data to a netCDF file. This code relies on functions in the ncdf4 library. If you know of another/better method for doing this please let us know, or modify this page accordingly! 
+
+=== Overwriting an existing netCDF file ===
+
+If you simply want to overwrite the data in an existing .nc or .ncf file you can use the nc_open(filename, write=TRUE) and ncvar_put(nc, varid,vals,start,count,...) commands.  Here is a simple example using a monthly sum deposition file for January.  This code opens an existing CMAQ output file, reads in the WD_OXN_TOT variable, modifies this variable and then writes it out to the same file.
+ require(ncdf4)
+ wdep.ioapi.file <- "/project/inf9w/kfoley/bidi_12US1_2006/CCTM_V5.1_aero6_Massad_Bidi_cb05_tx_D40_2006am.monthlysum.dep.01.copy"
+ dep.in <- nc_open(wdep.ioapi.file, write=T)
+ num.cols <- ncatt_get(dep.in, varid=0, attname="NCOLS")$value
+ num.rows <- ncatt_get(dep.in, varid=0, attname="NROWS")$value
+ num.layers <- ncatt_get(dep.in, varid=0, attname="NLAYS")$value
+ num.time.steps <- 1
+ WD_OXN_TOT.array <-  ncvar_get(nc=dep.in, varid="WD_OXN_TOT")
+ WD_OXN_TOT.new.array <- WD_OXN_TOT.array  +  10
+ ncvar_put(dep.in, "WD_OXN_TOT",WD_OXN_TOT.new.array,start=c(1,1,1,1),count=c(num.cols,num.rows,num.layers,num.time.steps))
+ dep.in <- nc_close(dep.in)
+ rm(dep.in)
+
+=== Creating a new netCDF file or modifying an existing file === 
+
+*'''Step 1:''' Create a .cdl file. This is a text representation of the binary netCDF datasets. The easiest way to do this is to create a .cdl file from an existing netCDF file and then edit it.
+
+ ncdump -h existing_file_name.ncf &gt; new_file_name.cdl
+
+*'''Step 2:''' Edit the .cdl file. Using your favorite text editor open the new .cdl file and modify the header information as needed. For example you can add/remove variables in the file (make sure to also update the VAR-LIST at the end of the file), change the number of time steps (TSTEP), change the start date (SDATE) and start time (STIME), etc. 
+*Note 1: For time dependent data with large number of time steps (e.g. 744 for a month of hourly data), you must specify TSTEP = UNLIMITED; in the .cdl file. Using an explicit TSTEP = 744; produces an error when using the ncgen command (Step 3). 
+*Note 2: There are Fortran specified character lengths for the I/O API character variables.  If you do not have the correct number of characters in these character fields (i.e. correct number of extra spaces) the ncgen command used in Step 3 will not work.  Here are the defined lengths:
+**longname = 16 characters 
+**units = 16 characters 
+**var_desc = 80 characters
+**VAR-LIST: 16 characters for each variable in the list
+For example: 
+
+ float WDEP_NO2(TSTEP, LAY, ROW, COL)&nbsp;;
+ WDEP_NO2:long_name = "WDEP_NO2        "&nbsp;;
+ WDEP_NO2:units = "kg/ha           "&nbsp;;
+ WDEP_NO2:var_desc = "NO2[2]                                                                          "&nbsp;;
+
+*'''Step 3:''' Create new netCDF file based on the specifications in the .cdl file.
+
+ ncgen -o new_file_name.ncf new_file_name.cdl
+
+*'''Step 4:'''  Write data to your new netCDF file using the nc_open(filename, write=TRUE) and ncvar_put commands.  The first variable in the netCDF file should be the variable TFLAG which is needed for the I/O API format.  The dimension of TFLAG should be 2 x number of variables in the file x number of time steps.  For each variable, TFLAG has 2 rows and a column for every time step.  The first row defines the day of the time step in the format YYYYDDD where DDD ranges from 001 to 365.  The 2nd row defines the hour of the time step in the format HH0000, e.g. hour 2 is written as 20000.  For example, in a file with 5 variables and only one time step (e.g. monthly sum for January 2006), the TFLAG array looks like this:
+       [,1]    [,2]    [,3]    [,4]    [,5]    
+ [1,] 2006001 2006001 2006001 2006001 2006001 
+ [2,]   10000   10000   10000   10000   10000
+
+For example if you wish to add 5 additional variables to an existing CMAQ output file containing 10 variables and 31 time steps, the steps would look like this:
+# Create the .cdl file based on the CMAQ file of interest.  
+# Edit this .cdl file by adding the 5 additional variables.  This includes changing VAR = 10; to VAR = 15; at the top of the .cdl file, adding the new float or int variables to the body of the file, and adding the new variable names to the VAR-LIST at the end of the file.
+# Use ncgen to create the empty (i.e. no data) netCDF file with the new updated list of variables.  
+# Create a new TFLAG variable that reflects the addition of the new variables.  For example if your original CMAQ file had 10 variables and 31 time steps the TFLAG in the file would have dimension 2 x 10 x 31.  Now you need to create a new TFLAG variable with dimension 2 x 15 x 31. This is trivial since the TFLAG array is identical for every variable, i.e. TFLAG[,1,] = TFLAG[,2,] = TFLAG[,3,], etc.     
+# Open the new netCDF file in R using nc_open(filename, write=T) and then write out the TFLAG variable and all 15 other variables using the ncvar_put command.
+# Close the new netCDF file using nc_close(filename).
