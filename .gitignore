@@ -1,2 +1,21 @@
 # ignore editor backup files
 *~
+
+# ignore R shell files
+.RData
+.Rhistory
+
+# ignore data files (upload them to github)
+*.csv
+*.csv.*
+*.dat
+*.dat.*
+*.nc
+*.nc.*
+*.ncf
+*.ncf.*
+*.rds
+*.rds.*
+
+# ignore visualizations (upload them to github)
+*.pdf
