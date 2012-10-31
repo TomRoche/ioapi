@@ -29,18 +29,18 @@ If you simply want to overwrite the data in an existing .nc or .ncf file you can
  ncdump -h existing_file_name.ncf &gt; new_file_name.cdl
 
 *'''Step 2:''' Edit the .cdl file. Using your favorite text editor open the new .cdl file and modify the header information as needed. For example you can add/remove variables in the file (make sure to also update the VAR-LIST at the end of the file), change the number of time steps (TSTEP), change the start date (SDATE) and start time (STIME), etc. 
-*Note 1: For time dependent data with large number of time steps (e.g. 744 for a month of hourly data), you must specify TSTEP = UNLIMITED; in the .cdl file. Using an explicit TSTEP = 744; produces an error when using the ncgen command (Step 3). 
-*Note 2: There are Fortran specified character lengths for the I/O API character variables.  If you do not have the correct number of characters in these character fields (i.e. correct number of extra spaces) the ncgen command used in Step 3 will not work.  Here are the defined lengths:
-**longname = 16 characters 
-**units = 16 characters 
-**var_desc = 80 characters
-**VAR-LIST: 16 characters for each variable in the list
+**Note 1: For time dependent data with large number of time steps (e.g. 744 for a month of hourly data), you must specify TSTEP = UNLIMITED; in the .cdl file. Using an explicit TSTEP = 744; produces an error when using the ncgen command (Step 3). 
+**Note 2: There are Fortran specified character lengths for the I/O API character variables.  If you do not have the correct number of characters in these character fields (i.e. correct number of extra spaces) the ncgen command used in Step 3 will not work.  Here are the defined lengths:
+***longname = 16 characters 
+***units = 16 characters 
+***var_desc = 80 characters
+***VAR-LIST: 16 characters for each variable in the list
 For example: 
 
  float WDEP_NO2(TSTEP, LAY, ROW, COL)&nbsp;;
  WDEP_NO2:long_name = "WDEP_NO2        "&nbsp;;
  WDEP_NO2:units = "kg/ha           "&nbsp;;
- WDEP_NO2:var_desc = "NO2[2]                                                                          "&nbsp;;
+ WDEP_NO2:var_desc = "NO2[2]                                                                          "
 
 *'''Step 3:''' Create new netCDF file based on the specifications in the .cdl file.
 
